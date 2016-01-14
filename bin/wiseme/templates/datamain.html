@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN" ng-app="homeModule">
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0,user-scalable=no"/>
+    <link rel="stylesheet" type="text/css" href="../static/css/foundation.min.css">
+    <link rel="stylesheet" type="text/css" href="../static/foundation-icons/foundation-icons.css">
+    <link rel="stylesheet" type="text/css" href="../static/css/normalize.css">
+    <link rel="stylesheet" type="text/css" href="../static/css/nearstyle.css">
+    <link rel="shortcut icon" href="../static/imgs/favicon.ico" type="image/x-icon">
+    <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/socket.io/0.9.16/socket.io.min.js"></script>
+    <script type="text/javascript" src="../static/js/jquery.min.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation.min.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation/foundation.topbar.js"></script>
+    <script src="http://cdn.bootcss.com/angular.js/1.4.0-rc.2/angular.min.js"></script>
+    <script type="text/javascript" src="../static/js/angular-sanitize.min.js"></script>
+    <script src="../static/js/echart/dist/echarts.js"></script>
+    <script type="text/javascript" charset="utf-8">
+        Date.prototype.Format = function (fmt) {
+            var o = {
+                "M+": this.getMonth() + 1, //月份
+                "d+": this.getDate(), //日
+                "h+": this.getHours(), //小时
+                "m+": this.getMinutes(), //分
+                "s+": this.getSeconds(), //秒
+                "q+": Math.floor((this.getMonth() + 3) / 3), //季度
+                "S": this.getMilliseconds() //毫秒
+            };
+            if (/(y+)/.test(fmt)) fmt = fmt.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
+            for (var k in o)
+            if (new RegExp("(" + k + ")").test(fmt)) fmt = fmt.replace(RegExp.$1, (RegExp.$1.length == 1) ? (o[k]) : (("00" + o[k]).substr(("" + o[k]).length)));
+            return fmt;
+        };
+        var _ERROR = {
+            _LOGIN_ERROR: '登录失败，请登录',
+            _AUTH_ERROR: '权限不足，请与管理员联系',
+            _HEAD_PAGE: "退一步海阔天空，别往前翻了",
+            _BACK_PAGE: "苦海无涯，回头是岸！别往后翻了",
+            _DATA_FAITURE: "获取数据失败，请点击其他标签尝试，如果不行，请与技术联系"
+        };
+        var rlpv_chart = null;
+        var rluv_chart = null;
+        var homeModule = angular.module("homeModule", ["ngSanitize"]);
+        homeModule.config(function ($interpolateProvider) {
+            $interpolateProvider.startSymbol("{[{");
+            $interpolateProvider.endSymbol("}]}");
+        });
+        //通用接口
+        homeModule.factory("Service", function ($http) {
+            service = {};
+            var ERROR_RETRUN = function (status, callback) {
+                if (status == 403) {
+                    callback({success: false, msg: _ERROR._AUTH_ERROR});
+                } else {
+                    callback({success: false, msg: _ERROR._DATA_FAITURE});
+                }
+            };
+
+            //获取信息（get)
+            service.getQueryData = function (url, params, callback) {
+                $http({
+                    method: "GET",
+                    url: url,
+                    params: params,
+                    timeout: 30000
+                }).success(function (data, status, headers, config) {
+                    if (data) {
+                        if (typeof(data) == 'object') {
+                            if (data["respcd"] == "0000") {
+                                callback({success: true, msg: data["respmsg"], data: data["data"]});
+                            } else {
+                                callback({success: false, msg: data["respmsg"]});
+                            }
+                        } else {
+                            callback({success: false, msg: _ERROR._LOGIN_ERROR});
+                        }
+                    } else {
+                        callback({success: false, msg: "数据为空"});
+                    }
+                }).error(function (data, status, headers, config) {
+                     ERROR_RETRUN(status, callback);
+                })
+            };
+
+                //发送信息接口
+            service.postFormData = function (url, params, callback) {
+                $http.post(url,params).success(function (data) {
+                    if (data) {
+                        callback(data);
+                    } else {
+                        callback([]);
+                    }
+                }).error(function (data, status) {
+                    ERROR_RETRUN(status, callback);
+                });
+            }
+
+            return service;
+        });
+        homeModule.controller("homeCtrl", function ($scope, Service){
+            $scope.time = "";
+            $scope.timegap = "";
+            $scope.datetime = new Date();
+            $scope.date = $scope.datetime.Format("yyyy-MM-dd");
+            $scope.datalist = [];
+            var socket = io.connect('http://' + document.domain + ':' + location.port);
+            socket.on('connect', function(ret) {
+                console.log("socket connected!!");
+                socket.send('socket connected');
+                socket.emit('askrlpvuv', "ask realtime-pvuv!");
+            });
+            socket.on('disconnect', function(ret) {
+                console.log("socket disconnected!!");
+                socket.send('disconnected');
+            });
+            socket.on('error', function(ret) {
+                console.log("socket error!!");
+                socket.send('error');
+            });
+            socket.on('currentpvuv', function(ret) {
+                console.log(ret);
+                $scope.time = ret.time;
+                //pvuv
+                if(ret.pvuv != undefined){
+                    $scope.timegap = ret.pvuv.t.time;
+                    $scope.setchartoption(ret.pvuv.y, ret.pvuv.t, ret.clock);
+                }
+                if ($scope.timegap){
+                    $scope.setRedline(rlpv_chart);
+                    $scope.setRedline(rluv_chart);
+                }
+                // near data
+                if (ret.dau_list != undefined && ret.dau_list.length != 0){
+                    var dl = [];
+                    for (var i = 0; i < ret.dau_list.length; i++){
+                        dl.push({
+                            "circle": ret.dau_list[i].region,
+                            "dau": ret.dau_list[i].dau
+                        })
+                    }
+                    $scope.$apply(function(){$scope.datalist = dl;});
+                }
+            });
+            $scope.setRedline = function(chart){
+                // 红线移动
+                var x = $scope.timegap.split(" ")[1].slice(0,5);
+                chart.delMarkLine(1, 't_start > t_end');
+                chart.addMarkLine(1, {
+                    symbol: "none",
+                    data: [
+                        [
+                            {name: 't_start', xAxis: x, yAxis: -1},
+                            {name: 't_end', xAxis: x, yAxis: 99999}
+                        ]
+                    ],
+                    itemStyle: {
+                        normal: {
+                            color: "red",
+                            lineStyle: {
+                                type: 'solid',
+                                width: 1
+                            },
+                            label:{
+                                textStyle:{
+                                    color: "black"
+                                },
+                                show: true,
+                                position: 'top',
+                                formatter: $scope.time
+                            }
+                        }
+                    }
+                });
+            };
+            $scope.setchartoption = function(y_data, t_data, clock){
+                // 数据走势更新
+                var option = rlpv_chart.getOption();
+                var uoption = rluv_chart.getOption();
+                var now = new Date();
+                var today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+                for (var i = 0; i < option.series[1].data.length; i++){
+                    option.series[1].data[i] = clock[i].pv;
+                    uoption.series[1].data[i] = clock[i].uv;
+                }
+                rlpv_chart.setOption(option);
+                rluv_chart.setOption(uoption);
+            };
+            $scope.getOption = function(cate, yd, td){
+                var defaultOption = {
+                    color: ['#CFCFCF', '#87cefa', '#da70d6'],
+                    animation: false,
+                    tooltip : {
+                        trigger: 'axis'
+                    },
+                    legend: {
+                        data:['昨日','今日']
+                    },
+                    calculable : true,
+                    xAxis : [
+                        {
+                            type : 'category',
+                            boundaryGap : false,
+                            data : cate
+                        }
+                    ],
+                    yAxis : [
+                        {
+                            type : 'value'
+                        }
+                    ],
+                    series : [{
+                        name:'昨日',
+                        symbol: 'none',
+                        type:'line',
+                        itemStyle: {
+                            normal: {
+                                lineStyle: {
+                                    type: 'solid',
+                                    width: 0
+                                },
+                                borderWidth: 0,
+                                areaStyle: {type: 'default'}
+                            }
+                        },
+                        data: yd
+                    },{
+                        name:'今日',
+                        symbol: 'none',
+                        type:'line',
+                        itemStyle: {
+                            normal: {
+                                lineStyle: {
+                                    type: 'solid',
+                                    width: 2
+                                },
+                                borderWidth: 0,
+                                areaStyle: {type: 'default'}
+                            }
+                        },
+                        z: 3,
+                        data: td
+                    }]
+                };
+                return defaultOption;
+            };
+            $scope.init = function(){
+                // 路径配置
+                require.config({
+                    paths: {
+                        echarts: '../static/js/echart/dist/'
+                    }
+                });
+                // 使用
+                require(
+                    [
+                        'echarts',
+                        'echarts/chart/line'
+                    ],
+                    function (ec) {
+                        // 基于准备好的dom，初始化echarts图表
+                        rlpv_chart = ec.init(document.getElementById('rlpv_chart'));
+                        rluv_chart = ec.init(document.getElementById('rluv_chart'));
+                        Service.getQueryData("/pvuv", {}, function(ret){
+                            if(ret.success){
+                                var yc = ret.data.y.clock;
+                                var tc = ret.data.t.clock;
+                                var xcategory = [];
+                                var y_data = [];
+                                var t_data = [];
+                                var y_udata = [];
+                                var t_udata = [];
+                                for (var i = 0; i < yc.length; i++){
+                                    var d = yc[i].datetime.split(" ")[1].slice(0,5);
+                                    xcategory.push(d);
+                                    y_data.push(yc[i].pv);
+                                    t_data.push(tc[i].pv);
+                                    y_udata.push(yc[i].uv);
+                                    t_udata.push(tc[i].uv);
+                                }
+                                // 为echarts对象加载数据
+                                rlpv_chart.setOption($scope.getOption(xcategory, y_data, t_data));
+                                rluv_chart.setOption($scope.getOption(xcategory, y_udata, t_udata));
+                            }
+                        });
+                    }
+                );
+            }
+        });
+    window.onresize = function(){
+        if (rlpv_chart != undefined){
+            rlpv_chart.resize();
+        }
+        if (rluv_chart != undefined){
+            rluv_chart.resize();
+        }
+    }
+    </script>
+    <title>qfpay</title>
+</head>
+<body class="body-view" ng-controller="homeCtrl" ng-init="init()">
+<nav class="top-bar header-view">
+    <div class="small-8 medium-3 large-3 columns" style="padding: 0">
+        <ul class="title-area">
+            <li class="name">
+                <a class="button branch-button" href="/"><strong><i class="fi-like medium"></i>钱方数据圈</strong></a>
+            </li>
+        </ul>
+    </div>
+    <div class="show-for-small small-4 columns end" style="text-align: right">
+            <a class="button radius" style="padding: 0;"><img class="radius" style="height: 28px; width: 28px; border-radius: 3px" src="{{ profile.avatar }}"></a>
+            <a class="" style="color: white" href="/logout">登出</a>
+    </div>
+    <section class="top-bar-section header-view">
+        <ul class="right hide-for-small">
+            <li class="name"><a class="button radius" style="padding: 0;"><img class="radius" style="height: 28px; width: 28px;border-bottom-left-radius: 3px" src="{{ profile.avatar }}"><strong style="padding: 0 5px 0 5px">{{ profile.nickname }}</strong></a></li>
+            <li class="name"><a class="" style="" href="/logout">登出</a></li>
+        </ul>
+    </section>
+</nav>
+<div class="row bodycontainer">
+    <div class="row">
+        <div class="row text-center">
+            <div class="large-4 large-centered medium-4 medium-centered columns">
+                <h4 style="color: #f5f5f5; background-color: rgba(0,0,0,0.15)">
+                    <i class="fi-torsos medium"></i>今日好近<br>
+                    <i class="fi-calendar medium"></i>{[{date}]}
+                </h4>
+            </div>
+            <div class="large-3 large-centered medium-3 medium-centered columns">
+                <a>
+                    <h4 style="color: #f5f5f5; background-color: rgba(0,0,0,0.15)">日活用户数</h4>
+                </a>
+            </div>
+        </div>
+        <div class="panel" style="padding:0;border: 0;background-color: #afd9ee">
+            <div class="medium-3 large-2 small-6 columns" ng-repeat="d in datalist">
+                <div class="label">
+                    {[{d.city}]} {[{d.circle}]}: {[{d.dau}]}
+                </div>
+            </div>
+        </div>
+        <div class="panel hide" style="padding:0;border: 0;background-color: #afd9ee">
+            <table>
+                <thead>
+                <tr>
+                    <th style="width: 100px">商圈</th>
+                    <th class="redhead">日活</th>
+                    <th class="redhead">同比</th>
+                    <th class="redhead">订单数</th>
+                    <th class="redhead">同比</th>
+                    <th class="redhead">日活率</th>
+                    <th class="redhead">同比</th>
+
+                    <th class="bluehead">新增用户</th>
+                    <th class="bluehead">累计用户</th>
+                    <th class="bluehead">订单转化率</th>
+                    <th class="bluehead">特卖单数</th>
+                    <th class="bluehead">外卖单数</th>
+                    <th class="bluehead">买单订单数</th>
+                    <th class="bluehead">总金额</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr ng-repeat="d in datalist">
+                    <td>{[{d.city}]}<br>{[{d.circle}]}</td>
+                    <td class="redbody">{[{d.dau}]}</td>
+                    <td class="redbody">-5%</td>
+                    <td class="redbody">1453</td>
+                    <td class="redbody">16%</td>
+                    <td class="redbody">19%</td>
+                    <td class="redbody">-2%</td>
+
+                    <td class="bluebody">97</td>
+                    <td class="bluebody">9940</td>
+                    <td class="bluebody">77%</td>
+                    <td class="bluebody">7215</td>
+                    <td class="bluebody">202</td>
+                    <td class="bluebody">1036</td>
+                    <td class="bluebody">32069</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="row">
+        <div class="row text-center">
+            <div class="large-4 large-centered medium-4 medium-centered columns">
+                <h4 style="color: #f5f5f5; background-color: rgba(0,0,0,0.15)"><i class="fi-torsos medium"></i>日活跃曲线</h4>
+            </div>
+        </div>
+        <div class="panel" style="padding:0;background-color: white">
+            <div id="rlpv_chart" style="height:350px; width:100%"></div>
+        </div>
+        <div class="row text-center">
+            <div class="large-4 large-centered medium-4 medium-centered columns">
+                <h4 style="color: #f5f5f5; background-color: rgba(0,0,0,0.15)"><i class="fi-torsos medium"></i>日活用户曲线</h4>
+            </div>
+        </div>
+        <div class="panel" style="padding:0;background-color: white">
+            <div id="rluv_chart" style="height:350px; width:100%"></div>
+        </div>
+    </div>
+</div>
+
+<footer>
+    <div class="row">
+        <p style="color: #afd9ee">
+            钱方数据 童叟无欺
+        </p>
+    </div>
+</footer>
+</body>
+</html>

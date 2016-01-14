@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN" ng-app="homeModule">
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0,user-scalable=no"/>
+    <link rel="stylesheet" type="text/css" href="../static/css/foundation.min.css">
+    <link rel="stylesheet" type="text/css" href="../static/foundation-icons/foundation-icons.css">
+    <link rel="stylesheet" type="text/css" href="../static/css/normalize.css">
+    <link rel="stylesheet" type="text/css" href="../static/css/nearstyle.css">
+    <link rel="stylesheet" href="http://code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css">
+    <link rel="shortcut icon" href="../static/imgs/favicon.ico" type="image/x-icon">
+    <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/socket.io/0.9.16/socket.io.min.js"></script>
+    <script type="text/javascript" src="../static/js/jquery.min.js"></script>
+    <script src="http://code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation.min.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation/foundation.topbar.js"></script>
+    <script src="http://cdn.bootcss.com/angular.js/1.4.0-rc.2/angular.min.js"></script>
+    <script type="text/javascript" src="../static/js/angular-sanitize.min.js"></script>
+    <script src="../static/js/echart/dist/echarts.js"></script>
+    <script type="text/javascript" charset="utf-8">
+    $(function() {
+        $( "#datepicker" ).datepicker({ dateFormat: 'yy-mm-dd',showButtonPanel: true});
+    });
+    Date.prototype.Format = function (fmt) {
+        var o = {
+            "M+": this.getMonth() + 1, //月份
+            "d+": this.getDate(), //日
+            "h+": this.getHours(), //小时
+            "m+": this.getMinutes(), //分
+            "s+": this.getSeconds(), //秒
+            "q+": Math.floor((this.getMonth() + 3) / 3), //季度
+            "S": this.getMilliseconds() //毫秒
+        };
+        if (/(y+)/.test(fmt)) fmt = fmt.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
+        for (var k in o)
+        if (new RegExp("(" + k + ")").test(fmt)) fmt = fmt.replace(RegExp.$1, (RegExp.$1.length == 1) ? (o[k]) : (("00" + o[k]).substr(("" + o[k]).length)));
+        return fmt;
+    };
+        var _ERROR = {
+            _LOGIN_ERROR: '登录失败，请登录',
+            _AUTH_ERROR: '权限不足，请与管理员联系',
+            _HEAD_PAGE: "退一步海阔天空，别往前翻了",
+            _BACK_PAGE: "苦海无涯，回头是岸！别往后翻了",
+            _DATA_FAITURE: "获取数据失败，请点击其他标签尝试，如果不行，请与技术联系"
+        };
+        var dau_chart = null;
+        var order_chart = null;
+        var homeModule = angular.module("homeModule", ["ngSanitize"]);
+        homeModule.config(function ($interpolateProvider) {
+            $interpolateProvider.startSymbol("{[{");
+            $interpolateProvider.endSymbol("}]}");
+        });
+        //通用接口
+        homeModule.factory("Service", function ($http) {
+            service = {};
+            var ERROR_RETRUN = function (status, callback) {
+                if (status == 403) {
+                    callback({success: false, msg: _ERROR._AUTH_ERROR});
+                } else {
+                    callback({success: false, msg: _ERROR._DATA_FAITURE});
+                }
+            };
+
+            //获取信息（get)
+            service.getQueryData = function (url, params, callback) {
+                $http({
+                    method: "GET",
+                    url: url,
+                    params: params,
+                    timeout: 30000
+                }).success(function (data, status, headers, config) {
+                    if (data) {
+                        if (typeof(data) == 'object') {
+                            if (data["respcd"] == "0000") {
+                                callback({success: true, msg: data["respmsg"], data: data["data"]});
+                            } else {
+                                callback({success: false, msg: data["respmsg"]});
+                            }
+                        } else {
+                            callback({success: false, msg: _ERROR._LOGIN_ERROR});
+                        }
+                    } else {
+                        callback({success: false, msg: "数据为空"});
+                    }
+                }).error(function (data, status, headers, config) {
+                     ERROR_RETRUN(status, callback);
+                })
+            };
+
+                //发送信息接口
+            service.postFormData = function (url, params, callback) {
+                $http.post(url,params).success(function (data) {
+                    if (data) {
+                        callback(data);
+                    } else {
+                        callback([]);
+                    }
+                }).error(function (data, status) {
+                    ERROR_RETRUN(status, callback);
+                });
+            }
+
+            return service;
+        });
+        homeModule.controller("homeCtrl", function ($scope, Service){
+            $scope.datetime = "";
+            $scope.init = function(){
+                $scope.chartlabel = "";
+                //$scope.userprofile = profile;
+                $scope.datetime = new Date((new Date())-(24*60*60*1000));
+                setInterval(function(){
+                    var curgettime = new Date((new Date())-(24*60*60*1000));
+                    var curgetdate = curgettime.Format("yyyy-MM-dd");
+                    var thengetdate = $scope.datetime.Format("yyyy-MM-dd");
+                    if (curgetdate != thengetdate){
+                        $scope.datetime = curgettime;
+                        $scope.date = $scope.datetime.Format("yyyy-MM-dd");
+                        $scope.update_data();
+                    }
+                }, 60000);
+                $scope.date = $scope.datetime.Format("yyyy-MM-dd");
+                $scope.datalist = [
+                    {
+                        "city": "北京",
+                        "circle": "三里屯soho",
+                        "dau": 435,
+                        "dau_r": -0.39,
+                        "o": 144,
+                        "o_r": -0.43,
+                        "dr": 0.11,
+                        "df_r": -0.08,
+                        "u": 22,
+                        "uall": 4035,
+                        "ocr": 0.33,
+                        "tm": 121,
+                        "wm": 155,
+                        "md": 811,
+                        "amt": 155555
+                    }
+                ];
+                $scope.monthly_data = [];
+                $scope.regionlist = [];
+                $scope.theDate = [];
+                $scope.update_data();
+                // 路径配置
+                require.config({
+                    paths: {
+                        echarts: '../static/js/echart/dist/'
+                    }
+                });
+                // 使用
+                require(
+                    [
+                        'echarts',
+                        'echarts/chart/line'
+                    ],
+                    function (ec) {
+                        // 基于准备好的dom，初始化echarts图表
+                        order_chart = ec.init(document.getElementById('order_chart'));
+                        var option = {
+                            animation: false,
+                            tooltip : {
+                                trigger: 'axis'
+                            },
+                            legend: {
+                                data:[]
+                            },
+                            calculable : true,
+                            xAxis : [
+                                {
+                                    type : 'category',
+                                    boundaryGap : false,
+                                    axisLabel:{
+                                        interval:0,
+                                        formatter: function (value){
+                                            var weekday = new Date(value).getDay();
+                                            var add = "";
+                                            if (weekday == 6 || weekday == 0){
+                                                add = "s";
+                                            }
+                                            if(value[0] == "\n"){
+                                                return "\n"+value.slice(6)+add;
+                                            }
+                                            return value.slice(5)+add;
+                                        }
+                                    },
+
+                                    data : []
+                                }
+                            ],
+                            yAxis : [
+                                {
+                                    type : 'value'
+                                }
+                            ],
+                            series : []
+                        };
+                        // 为echarts对象加载数据
+                        order_chart.setOption(option);
+                        $scope.get_monthly_data();
+                    }
+                );
+            };
+            $scope.update_data = function(){
+                Service.getQueryData("/daily", {"date": $scope.date}, function(ret){
+                    if(ret.success){
+                        var dl = [];
+                        var region_list = ret.data;
+                        for(var i = 0; i < region_list.length; i++){
+                            var city = region_list[i].city_name;
+                            if (city=="市辖区"){
+                                city = region_list[i].province_name;
+                            }
+                            var dau = region_list[i].y_dau!=undefined?region_list[i].y_dau.value:"-";//日活数
+                            var y_trade_hjuser_cnt = region_list[i].y_trade_hjuser_cnt!=undefined?region_list[i].y_trade_hjuser_cnt.value:"-";//好近交易用户数
+                            var y_user_add_cnt = region_list[i].y_user_add_cnt!=undefined?region_list[i].y_user_add_cnt.value:"-";//好近新增用户数
+                            var user_cnt = region_list[i].user_cnt!=undefined?region_list[i].user_cnt.value:"-";//好近累计用户数
+                            var dr = "-";
+                            var tm = region_list[i].y_tm_cnt!=undefined?region_list[i].y_tm_cnt.value:"-";
+                            var wm = region_list[i].y_wm_cnt!=undefined?region_list[i].y_wm_cnt.value:"-";
+                            var md = region_list[i].y_md_cnt!=undefined?region_list[i].y_md_cnt.value:"-";
+                            var tm_amt = region_list[i].y_tm_amt!=undefined?region_list[i].y_tm_amt.value/100.0:"-";
+                            var wm_amt = region_list[i].y_wm_amt!=undefined?region_list[i].y_wm_amt.value/100.0:"-";
+                            var md_amt = region_list[i].y_md_amt!=undefined?region_list[i].y_md_amt.value/100.0:"-";
+                            var amt = "-";
+                            var o = "-";
+                            var pay_dau_r = "-"; //交易转化率
+                            try{
+                                amt = (region_list[i].y_tm_amt.value+region_list[i].y_wm_amt.value+region_list[i].y_md_amt.value)/100.0;
+                                o = region_list[i].y_tm_cnt.value+region_list[i].y_wm_cnt.value+region_list[i].y_md_cnt.value;
+                                dr = (dau*100/user_cnt).toFixed(2);
+                                pay_dau_r = (y_trade_hjuser_cnt*100/dau).toFixed(2);
+                            }catch(e){
+                                amt = "-";
+                                o = "-";
+                                dr = "-";
+                                pay_dau_r = "-";
+                            }
+                            // 微信交易数，金额，交易商户数
+                            var wx_cnt = region_list[i].y_wx_num!=undefined?region_list[i].y_wx_num.value:"-";
+                            var wx_amt = region_list[i].y_wx_amt!=undefined?region_list[i].y_wx_amt.value/100.0:"-";
+                            var wx_sale_shop_cnt = region_list[i].y_sale_shop_cnt!=undefined?region_list[i].y_sale_shop_cnt.value:"-";
+                            dl.push({
+                                "city": city,
+                                "region_id": region_list[i].region_id,
+                                "circle": region_list[i].region,
+                                "dau": dau,
+                                "dr": dr,
+                                "u": y_user_add_cnt,
+                                "uall": user_cnt,
+                                "pay_u": y_trade_hjuser_cnt,
+                                "pay_dau_r": pay_dau_r,
+                                "tm": tm,
+                                "wm": wm,
+                                "md": md,
+                                "tm_amt": tm_amt,
+                                "wm_amt": wm_amt,
+                                "md_amt": md_amt,
+                                "amt": amt,
+                                "o": o,
+                                "wx_cnt": wx_cnt,
+                                "wx_amt": wx_amt,
+                                "wx_sale_shop_cnt": wx_sale_shop_cnt
+                            })
+                        }
+                        $scope.datalist = dl;
+                    }
+                });
+            };
+
+            $scope.get_monthly_data = function(){
+                Service.getQueryData("/monthly", {}, function(ret){
+                    if(ret.success){
+                        $scope.monthly_data = ret.data.data;
+                        $scope.regionlist = ret.data.region_list;
+                        $scope.setchartoption("orders_cnt");
+                        $scope.chartlabel='总订单数';
+                    }
+                });
+            };
+
+            $scope.setchartoption = function(varname){
+                // 数据走势更新
+                var option = order_chart.getOption();
+                option.legend.data = $scope.regionlist;
+                option.series = [];
+                var datelist = [];
+                for(var i = 0; i < $scope.regionlist.length; i++){
+                    var orders_cnt = [];
+                    for(var j = 0; j < $scope.monthly_data.length; j++){
+                        if(datelist.length < $scope.monthly_data.length){
+                            //双数添加换行
+                            var strdate = "";
+                            if (j%2){
+                                strdate = "\n"+$scope.monthly_data[j].date;
+                            }else{
+                                strdate = $scope.monthly_data[j].date;
+                            }
+                            datelist.push(strdate);
+                        }
+                        //没有数据则添加0
+                        if(!$scope.monthly_data[j] || $scope.monthly_data[j].regions[$scope.regionlist[i]] == undefined){
+                            orders_cnt.push(0);
+                            continue;
+                        }
+                        if (varname == "orders_cnt"){
+                            orders_cnt.push((
+                                $scope.monthly_data[j].regions[$scope.regionlist[i]].y_tm_cnt+
+                                $scope.monthly_data[j].regions[$scope.regionlist[i]].y_wm_cnt+
+                                $scope.monthly_data[j].regions[$scope.regionlist[i]].y_md_cnt
+                                ));
+                        }else if (varname == "orders_amt"){
+                            orders_cnt.push((
+                                $scope.monthly_data[j].regions[$scope.regionlist[i]].y_tm_amt+
+                                $scope.monthly_data[j].regions[$scope.regionlist[i]].y_wm_amt+
+                                $scope.monthly_data[j].regions[$scope.regionlist[i]].y_md_amt
+                                ));
+                        }else{
+                            orders_cnt.push($scope.monthly_data[j].regions[$scope.regionlist[i]][varname]);
+                        }
+                    }
+                    option.series.push({
+                        name:$scope.regionlist[i],
+                        symbol: 'none',
+                        type:'line',
+                        itemStyle: {
+                            normal: {
+                                lineStyle: {
+                                    type: 'solid',
+                                    width: 1
+                                }
+                            }
+                        },
+                        data: orders_cnt
+                    });
+                }
+                option.xAxis[0].data = datelist;
+                order_chart.setOption(option);
+            };
+        });
+    window.onresize = function(){
+        if (order_chart != undefined){
+            order_chart.resize();
+        }
+    }
+    </script>
+    <title>qfpay</title>
+</head>
+<body class="body-view" ng-controller="homeCtrl" ng-init="init()">
+<nav class="top-bar header-view">
+    <div class="small-8 medium-3 large-3 columns" style="padding: 0">
+        <ul class="title-area">
+            <li class="name">
+                <a class="button branch-button" href="/"><strong><i class="fi-like medium"></i>钱方数据圈</strong></a>
+            </li>
+        </ul>
+    </div>
+    <div class="show-for-small small-4 right-align columns end" style="text-align: right">
+            <a class="button radius" style="padding: 0;"><img class="radius" style="height: 28px; width: 28px; border-radius: 3px" src="{{ profile.avatar }}"></a>
+            <a class="" style="color: white" href="/logout">登出</a>
+    </div>
+    <section class="top-bar-section header-view">
+        <ul class="right hide-for-small">
+            <li class="name"><a class="button radius" style="padding: 0;"><img class="radius" style="height: 28px; width: 28px;border-bottom-left-radius: 3px" src="{{ profile.avatar }}"><strong style="padding: 0 5px 0 5px">{{ profile.nickname }}</strong></a></li>
+            <li class="name"><a class="" style="" href="/logout">登出</a></li>
+        </ul>
+    </section>
+</nav>
+<div style="width:100%; height:100%; position: fixed">
+        <div class="row">
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+        </div>
+        <div class="row">
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+        </div>
+        <div class="row">
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+        </div>
+        <div class="row">
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+        </div>
+        <div class="row">
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+        </div>
+        <div class="row">
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+        </div>
+        <div class="row">
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+        </div>
+        <div class="row">
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+        </div>
+        <div class="row">
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-4 medium-4 small-4 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+        </div>
+        <div class="row">
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+            <div class="large-3 medium-3 small-3 columns text-center"><h1 class="waterprint">{{ profile.uid }}</h1></div>
+        </div>
+    </div>
+<div class="row bodycontainer">
+    <div class="row">
+        <div class="row text-center">
+            <div class="large-4 large-centered medium-4 medium-centered columns">
+                <h4 style="color: #f5f5f5; background-color: rgba(0,0,0,0.15)"><i class="fi-torsos medium"></i>好近商圈运营数据</h4>
+            </div>
+            <div class="large-3 large-centered medium-3 medium-centered columns">
+                <h4 style="color: #f5f5f5; background-color: rgba(0,0,0,0.15)"><i class="fi-calendar medium"></i><input readonly="true" class="datepicker" style="border: 0; background-color: transparent" type="text" id="datepicker" ng-model="date" ng-change="update_data()"></h4>
+            </div>
+        </div>
+        <div class="panel" style="padding:0;border: 0;background-color: #afd9ee">
+            <table>
+                <thead>
+                <tr>
+                    <th style="width: 100px">商圈</th>
+
+                    <th class="redhead">日活</th>
+                    <th class="redhead">订单数</th>
+                    <th class="redhead">日活率</th>
+                    <th class="redhead">新增用户</th>
+                    <th class="redhead">累计用户</th>
+
+                    <th class="bluehead">交易用户</th>
+                    <th class="bluehead">转化率</th>
+                    <th class="bluehead">特卖</th>
+                    <th class="bluehead">外卖</th>
+                    <th class="bluehead">买单</th>
+                    <th class="bluehead">总金额</th>
+
+                    <th class="greenhead">微信交易</th>
+                    <th class="greenhead">微信交易商户数</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr ng-repeat="d in datalist">
+                    <td>{[{d.city}]}<br>{[{d.circle}]}</td>
+
+                    <td class="redbody">{[{d.dau}]}</td>
+                    <td class="redbody">{[{d.o}]}</td>
+                    <td class="redbody">{[{d.dr}]}%</td>
+                    <td class="redbody">{[{d.u}]}</td>
+                    <td class="redbody">{[{d.uall}]}</td>
+
+                    <td class="bluebody">{[{d.pay_u}]}</td>
+                    <td class="bluebody">{[{d.pay_dau_r}]}%</td>
+                    <td class="bluebody">{[{d.tm}]}笔<br>{[{d.tm_amt}]}元</td>
+                    <td class="bluebody">{[{d.wm}]}笔<br>{[{d.wm_amt}]}元</td>
+                    <td class="bluebody">{[{d.md}]}笔<br>{[{d.md_amt}]}元</td>
+                    <td class="bluebody">{[{d.amt}]}元</td>
+
+                    <td class="greenbody">{[{d.wx_cnt}]}笔<br>{[{d.wx_amt}]}元</td>
+                    <td class="greenbody">{[{d.wx_sale_shop_cnt}]}</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="row text-center">
+            <div class="large-11 large-centered medium-11 medium-centered columns" style="background-color: rgba(0,0,0,0.15)">
+                <a style="color: #f5f5f5;" ng-click="setchartoption('orders_cnt'); chartlabel='总订单数'"><span style="padding: 10px">总订单数</span></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('y_tm_cnt'); chartlabel='特卖笔数'"><span style="padding: 10px">特卖笔数</span></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('y_wm_cnt'); chartlabel='外卖笔数'"><span style="padding: 10px">外卖笔数</span></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('y_md_cnt'); chartlabel='买单笔数'"><span style="padding: 10px">买单笔数</span ></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('y_user_add_cnt'); chartlabel='新增用户'"><span style="padding: 10px">新增用户</span ></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('user_cnt'); chartlabel='累计用户'"><span style="padding: 10px">累计用户</span ></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('y_trade_hjuser_cnt'); chartlabel='交易用户'"><span style="padding: 10px">交易用户</span ></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('y_dau'); chartlabel='日活用户'"><span style="padding: 10px">日活用户</span ></a>
+            </div>
+            <div class="large-11 large-centered medium-11 medium-centered columns" style="background-color: rgba(0,0,0,0.15)">
+                <a style="color: #f5f5f5;" ng-click="setchartoption('orders_amt'); chartlabel='总金额'"><span style="padding: 10px">总金额</span></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('y_tm_amt'); chartlabel='特卖金额'"><span style="padding: 10px">特卖金额</span></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('y_wm_amt'); chartlabel='外卖金额'"><span style="padding: 10px">外卖金额</span></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('y_md_amt'); chartlabel='买单金额'"><span style="padding: 10px">买单金额</span ></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('y_wx_cnt'); chartlabel='微信交易金额'"><span style="padding: 10px">微信交易金额</span ></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('y_wx_amt'); chartlabel='微信交易笔数'"><span style="padding: 10px">微信交易笔数</span ></a>
+                <a style="color: #f5f5f5;" ng-click="setchartoption('y_sale_shop_cnt'); chartlabel='微信交易商户数'"><span style="padding: 10px">微信交易商户数</span ></a>
+            </div>
+        </div>
+        <div class="row text-center">
+            <div class="large-4 large-centered medium-4 medium-centered columns">
+                <h4 style="color: #f5f5f5; background-color: rgba(0,0,0,0.15)"><i class="fi-torsos medium"></i>商圈月{[{ chartlabel }]}曲线</h4>
+            </div>
+        </div>
+        <div class="panel" style="padding:0;border: 0;">
+            <div id="order_chart" style="height:350px; width:100%"></div>
+        </div>
+    </div>
+</div>
+<footer>
+    <div class="row">
+        <p style="color: #afd9ee">
+            钱方数据 童叟无欺
+        </p>
+    </div>
+</footer>
+</body>
+</html>

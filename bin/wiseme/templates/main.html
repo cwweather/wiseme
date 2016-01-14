@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN" ng-app="homeModule">
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0,user-scalable=no"/>
+    <link rel="stylesheet" type="text/css" href="../static/css/foundation.min.css">
+    <link rel="stylesheet" type="text/css" href="../static/css/normalize.css">
+    <link rel="stylesheet" type="text/css" href="../static/css/nearstyle.css">
+    <link rel="stylesheet" type="text/css" href="../static/foundation-icons/foundation-icons.css">
+    <link rel="shortcut icon" href="../static/imgs/favicon.ico" type="image/x-icon">
+    <script type="text/javascript" src="../static/js/jquery.min.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation.min.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation/foundation.topbar.js"></script>
+    <script src="http://cdn.bootcss.com/angular.js/1.4.0-rc.2/angular.min.js"></script>
+    <script type="text/javascript" src="../static/js/angular-sanitize.min.js"></script>
+    <script type="text/javascript" charset="utf-8">
+        var _ERROR = {
+            _LOGIN_ERROR: '登录失败，请登录',
+            _AUTH_ERROR: '权限不足，请与管理员联系',
+            _HEAD_PAGE: "退一步海阔天空，别往前翻了",
+            _BACK_PAGE: "苦海无涯，回头是岸！别往后翻了",
+            _DATA_FAITURE: "获取数据失败，请点击其他标签尝试，如果不行，请与技术联系"
+        };
+
+        var homeModule = angular.module("homeModule", ["ngSanitize"]);
+        homeModule.config(function ($interpolateProvider) {
+            $interpolateProvider.startSymbol("{[{");
+            $interpolateProvider.endSymbol("}]}");
+        });
+        //通用接口
+        homeModule.factory("Service", function ($http) {
+            service = {};
+            var ERROR_RETRUN = function (status, callback) {
+                if (status == 403) {
+                    callback({success: false, msg: _ERROR._AUTH_ERROR});
+                } else {
+                    callback({success: false, msg: _ERROR._DATA_FAITURE});
+                }
+            };
+
+            //获取信息（get)
+            service.getQueryData = function (url, params, callback) {
+                $http({
+                    method: "GET",
+                    url: url,
+                    params: params,
+                    timeout: 30000
+                }).success(function (data, status, headers, config) {
+                    if (data) {
+                        if (typeof(data) == 'object') {
+                            if (data["respcd"] == "0000") {
+                                callback({success: true, msg: data["respmsg"], data: data["data"]});
+                            } else {
+                                callback({success: false, msg: data["respmsg"]});
+                            }
+                        } else {
+                            callback({success: false, msg: _ERROR._LOGIN_ERROR});
+                        }
+                    } else {
+                        callback({success: false, msg: "数据为空"});
+                    }
+                }).error(function (data, status, headers, config) {
+                     ERROR_RETRUN(status, callback);
+                })
+            };
+
+                //发送信息接口
+            service.postFormData = function (url, params, callback) {
+                $http.post(url,params).success(function (data) {
+                    if (data) {
+                        callback(data);
+                    } else {
+                        callback([]);
+                    }
+                }).error(function (data, status) {
+                    ERROR_RETRUN(status, callback);
+                });
+            }
+
+            return service;
+        });
+        homeModule.controller("homeCtrl", function ($scope, Service){
+            $scope.init = function(){
+            };
+        });
+
+    </script>
+    <title>qfpay</title>
+</head>
+<body class="body-view" ng-controller="homeCtrl" ng-init="init()">
+<nav class="top-bar header-view">
+    <div class="small-8 medium-3 large-3 columns" style="padding: 0">
+        <ul class="title-area">
+            <li class="name">
+                <a class="button branch-button" href="/"><strong><i class="fi-like medium"></i>钱方数据圈</strong></a>
+            </li>
+        </ul>
+    </div>
+    <div class="show-for-small small-4 columns end" style="text-align: right">
+            <a class="button radius" style="padding: 0;"><img class="radius" style="height: 28px; width: 28px; border-radius: 3px" src="{{ profile.avatar }}"></a>
+            <a class="" style="color: white" href="/logout">登出</a>
+    </div>
+    <section class="top-bar-section header-view">
+        <ul class="right hide-for-small">
+            <li class="name"><a class="button radius" style="padding: 0;"><img class="radius" style="height: 28px; width: 28px;border-bottom-left-radius: 3px" src="{{ profile.avatar }}"><strong style="padding: 0 5px 0 5px">{{ profile.nickname }}</strong></a></li>
+            <li class="name"><a class="" style="" href="/logout">登出</a></li>
+        </ul>
+    </section>
+</nav>
+<div class="row bodycontainer">
+    <div class="row">
+        <div class="large-4 medium-4 columns">
+            <h4 style="color: #f5f5f5; background-color: rgba(0,0,0,0.15)"><i class="fi-torsos medium"></i>实时业务数据</h4>
+        </div>
+    </div>
+    <div class="row">
+        <div class="small-12 medium-4 large-4 columns">
+            <a class="panel radius button ablock" href="/lookorder">
+                好近外卖订单中心
+            </a>
+        </div>
+        <div class="small-12 medium-4 large-4 columns">
+            <a class="panel radius button ablock" href="/ht">
+                好近泡泡堂
+            </a>
+        </div>
+        <div class="small-12 medium-4 large-4 columns">
+            <a class="panel radius button ablock" href="/data">
+                好近实时活跃曲线
+            </a>
+        </div>
+    </div>
+    <div class="row">
+        <div class=" large-4 medium-4 columns">
+            <h4 style="color: #f5f5f5; background-color: rgba(0,0,0,0.15)"><i class="fi-graph-bar medium"></i>报表数据</h4>
+        </div>
+    </div>
+    <div class="row">
+        <div class="small-12 medium-4 large-4 columns">
+            <a class="panel radius button ablock" href="/data">
+                好近今日
+            </a>
+        </div>
+        <div class="small-12 medium-4 large-4 columns">
+            <a class="panel radius button ablock" href="/all">
+                好近日报
+            </a>
+        </div>
+        <div class="small-12 medium-4 large-4 columns">
+            <a class="panel radius button ablock" href="http://172.100.102.101:8194/finder">
+                用户筛选
+            </a>
+        </div>
+    </div>
+    <div class="row">
+        <div class=" large-4 medium-4 columns">
+            <h4 style="color: #f5f5f5; background-color: rgba(0,0,0,0.15)"><i class="fi-widget medium"></i>管理</h4>
+        </div>
+    </div>
+    <div class="row">
+        <div class="small-12 medium-4 large-3 columns">
+            <a class="panel radius button ablock" href="http://manage.fengmiapp.com/audit/">
+                用户管理
+            </a>
+        </div>
+    </div>
+</div>
+<footer>
+    <div class="row">
+        <p style="color: #afd9ee">
+            钱方数据 童叟无欺
+        </p>
+    </div>
+</footer>
+</body>
+</html>

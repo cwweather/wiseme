@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN" ng-app="lookorderModule">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0,user-scalable=no"/>
+    <link rel="stylesheet" type="text/css" href="../static/css/foundation.min.css">
+    <link rel="stylesheet" type="text/css" href="../static/css/normalize.css">
+    <link rel="stylesheet" type="text/css" href="../static/css/nearstyle.css">
+    <link rel="stylesheet" type="text/css" href="../static/foundation-icons/foundation-icons.css">
+    <link rel="stylesheet" href="http://code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css">
+    <link rel="shortcut icon" href="../static/imgs/favicon.ico" type="image/x-icon">
+    <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/socket.io/0.9.16/socket.io.min.js"></script>
+    <script type="text/javascript" src="../static/js/jquery.min.js"></script>
+    <script src="http://code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation.min.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation/foundation.topbar.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation/foundation.reveal.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation/foundation.dropdown.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation/foundation.magellan.js"></script>
+    <script src="http://cdn.bootcss.com/angular.js/1.4.0-rc.2/angular.min.js"></script>
+    <script type="text/javascript" src="../static/js/angular-sanitize.min.js"></script>
+    <script type="text/javascript" src="../static/js/lookorder.js"></script>
+    <title>钱方数据 童叟无欺</title>
+    <script>
+    $(function() {
+        $( "#datepicker" ).datepicker();
+        $( "#datepicker1" ).datepicker();
+    });
+    </script>
+</head>
+<body ng-controller="lookorderCtrl" ng-init="init()" style="">
+<nav class="top-bar">
+    <ul class="title-area">
+        <li class="name">
+            <h1><a href="/"><strong>钱方好近</strong><small>数据平台</small></a></h1>
+        </li>
+    </ul>
+    <section ng-show="{{profile}}" class="top-bar-section">
+        <ul class="right">
+            <li class="name"><p style="color: #737373">你好！{{ profile.nickname }}</p></li>
+            <li><img style="margin:5px; height: 30px; width: 30px" src="{{ profile.avatar }}"></li>
+            <li class="name"><a style="color: #737373" href="/logout">登出</a></li>
+        </ul>
+    </section>
+</nav>
+<div class="row">
+    <div class="panel" style="border: 0"><h1 class="">好近外卖<small>订单中心</small></h1></div>
+    <hr>
+</div>
+<div class="show-for-small row panel" style="background-color: transparent">
+    <div class="small-12 columns">
+        <ul class="button-group stack">
+            <li>
+                <span class="label button" ng-show="day==1" ng-click="goto(page,1)"><h5>今天</h5></span>
+                <span class="label button secondary" ng-show="day!=1"
+                      ng-click="day=1;date='某天';goto(page,1)"><h5 style="color: #000000">今天</h5></span>
+            </li>
+            <li>
+                <input ng-class="{hit:(date!='某天'),unhit:(date=='某天')}" class="label button"
+                       type="text" id="datepicker1" ng-model="date" ng-change="day=0;goto(page,1)">
+            </li>
+            <li>
+                <span class="label button secondary" ng-show="!shanghuot" ng-click="peisongot=0;shanghuot=1;tag_delivery[1]=1;tag_delivery[2]=0;tag_delivery[3]=0;tag_delivery[4]=0;tag_delivery[5]=0;goto(page,1)">
+                    <h5>商户超时<span ng-show="count_shto" class="redbadge">{[{count_shto}]}</span></h5>
+                </span>
+                <span class="label button" ng-show="shanghuot" ng-click="shanghuot=0;alldeliverytag(1);goto(page,1)">
+                    <h5>商户超时<span ng-show="count_shto" class="redbadge">{[{count_shto}]}</span></h5>
+                </span>
+            </li>
+            <li>
+                <span class="label button secondary" ng-show="!peisongot" ng-click="peisongot=1;shanghuot=0;tag_delivery[1]=0;tag_delivery[2]=1;tag_delivery[3]=0;tag_delivery[4]=0;tag_delivery[5]=0;goto(page,1)">
+                    <h5>配送超时<span ng-show="count_psto" class="redbadge">{[{count_psto}]}</span></h5>
+                </span>
+
+                <span class="label button" ng-show="peisongot" ng-click="peisongot=0;alldeliverytag(1);goto(page,1)">
+                    <h5>配送超时<span ng-show="count_psto" class="redbadge">{[{count_psto}]}</span></h5>
+                </span>
+            </li>
+            <li>
+                <span ng-show="tag_delivery[1]" class="label button " ng-click="alltag(0);tag_delivery[1]=1;goto(page,1)">
+                <h5>1.已付款<span ng-show="count_neworderall" class="badge">{[{count_neworderall}]}</span>
+                <span ng-show="count_neworderto" class="redbadge">{[{count_neworderto}]}</span></h5></span>
+
+                <span ng-show="!tag_delivery[1]" class="label secondary button " ng-click="alltag(0);tag_delivery[1]=1;goto(page,1)">
+                <h5>1.已付款<span ng-show="count_neworderall" class="badge">{[{count_neworderall}]}</span>
+                <span ng-show="count_neworderto" class="redbadge">{[{count_neworderto}]}</span></h5></span>
+            </li>
+            <li>
+                <span ng-show="tag_delivery[2]" class="label button " ng-click="alltag(0);tag_delivery[2]=1;goto(page,1)"><h5>
+                2.商家确认<span ng-show="count_acceptall" class="badge">{[{count_acceptall}]}</span>
+                <span ng-show="count_acceptto" class="redbadge">{[{count_acceptto}]}</span></h5></span>
+
+                <span ng-show="!tag_delivery[2]" class="label secondary button " ng-click="alltag(0);tag_delivery[2]=1;goto(page,1)"><h5>
+                2.商家确认<span ng-show="count_acceptall" class="badge">{[{count_acceptall}]}</span>
+                <span ng-show="count_acceptto" class="redbadge">{[{count_acceptto}]}</span></h5></span>
+            </li>
+            <li>
+                <span ng-show="tag_delivery[3]" class="label button " ng-click="alltag(0);tag_delivery[3]=1;goto(page,1)">
+                <h5>3.配送确认<span ng-show="count_delaccall" class="badge">{[{count_delaccall}]}</span>
+                <span ng-show="count_delaccto" class="redbadge">{[{count_delaccto}]}</span></h5></span>
+
+                <span ng-show="!tag_delivery[3]" class="label secondary button " ng-click="alltag(0);tag_delivery[3]=1;goto(page,1)">
+                <h5>3.配送确认<span ng-show="count_delaccall" class="badge">{[{count_delaccall}]}</span>
+                <span ng-show="count_delaccto" class="redbadge">{[{count_delaccto}]}</span></h5></span>
+            </li>
+            <li>
+                <span ng-show="tag_delivery[4]" class="label button" ng-click="alltag(0);tag_delivery[4]=1;goto(page,1)">
+                <h5>4.正在派送<span ng-show="count_deliveryall" class="badge">{[{count_deliveryall}]}</span>
+                <span ng-show="count_deliveryto" class="redbadge">{[{count_deliveryto}]}</span></h5></span>
+
+                <span ng-show="!tag_delivery[4]" class="label secondary button" ng-click="alltag(0);tag_delivery[4]=1;goto(page,1)">
+                <h5>4.正在派送<span ng-show="count_deliveryall" class="badge">{[{count_deliveryall}]}</span>
+                <span ng-show="count_deliveryto" class="redbadge">{[{count_deliveryto}]}</span></h5></span>
+            </li>
+            <li>
+                <span ng-show="tag_delivery[5]" class="label button" ng-click="alltag(0);tag_delivery[5]=1;goto(page,1)">
+                <h5>5.已送达<span ng-show="count_arrivalall" class="badge">{[{count_arrivalall}]}</span>
+                <span ng-show="count_arrivalto" class="redbadge">{[{count_arrivalto}]}</span></h5></span>
+
+                <span ng-show="!tag_delivery[5]" class="label secondary button" ng-click="alltag(0);tag_delivery[5]=1;goto(page,1)">
+                <h5>5.已送达<span ng-show="count_arrivalall" class="badge">{[{count_arrivalall}]}</span>
+                <span ng-show="count_arrivalto" class="redbadge">{[{count_arrivalto}]}</span></h5></span>
+            </li>
+        </ul>
+    </div>
+    <div class="small-12 columns">
+        <div ng-if="ns==0" data-alert class="alert-box info text-center button" style="margin-bottom: 0;" ng-click="alltag(0);alldeliverytag(1);goto(page, 1)">
+            <strong>{[{ time.split(" ", 2)[0] }]}
+                {[{ time.split(" ", 2)[1] }]}</strong>
+            <br>
+             <i ng-show="tb_change" class="fi-refresh medium"></i>
+             <i ng-show="!tb_change" class="fi-minus medium"></i>
+        </div>
+        <div ng-if="ns==1" data-alert class="alert-box success text-center button" style="margin-bottom: 0;" ng-click="alltag(0);alldeliverytag(1);goto(page, 1)">
+            <strong>{[{ time.split(" ", 2)[0] }]}
+                {[{ time.split(" ", 2)[1] }]}</strong>
+            <br>
+            <i class="fi-rss medium"></i>
+        </div>
+    </div>
+</div>
+<div class="hide-for-small row panel" style="background-color: transparent">
+    <div class="medium-1 columns top-divider" style="padding-left:0;">
+        <ul class="button-group stack">
+            <li>
+                <span class="label button" ng-show="day==1" ng-click="goto(page,1)"><h5>今天</h5></span>
+                <span class="label button secondary" ng-show="day!=1"
+                      ng-click="day=1;date='某天';goto(page,1)"><h5 style="color: #000000">今天</h5></span>
+            </li>
+            <li>
+                <input ng-class="{hit:(date!='某天'),unhit:(date=='某天')}" class="label button"
+                       type="text" id="datepicker" ng-model="date" ng-change="day=0;goto(page,1)">
+            </li>
+        </ul>
+    </div>
+    <div class="medium-2 columns top-divider">
+        <ul class="button-group stack">
+            <li>
+                <span class="label button secondary" ng-show="!shanghuot" ng-click="peisongot=0;shanghuot=1;tag_delivery[1]=1;tag_delivery[2]=0;tag_delivery[3]=0;tag_delivery[4]=0;tag_delivery[5]=0;goto(page,1)">
+                    <h5>商户超时<span ng-show="count_shto" class="redbadge">{[{count_shto}]}</span></h5>
+                </span>
+                <span class="label button" ng-show="shanghuot" ng-click="shanghuot=0;alldeliverytag(1);goto(page,1)">
+                    <h5>商户超时<span ng-show="count_shto" class="redbadge">{[{count_shto}]}</span></h5>
+                </span>
+            </li>
+            <li>
+                <span class="label button secondary" ng-show="!peisongot" ng-click="peisongot=1;shanghuot=0;tag_delivery[1]=0;tag_delivery[2]=1;tag_delivery[3]=0;tag_delivery[4]=0;tag_delivery[5]=0;goto(page,1)">
+                    <h5>配送超时<span ng-show="count_psto" class="redbadge">{[{count_psto}]}</span></h5>
+                </span>
+
+                <span class="label button" ng-show="peisongot" ng-click="peisongot=0;alldeliverytag(1);goto(page,1)">
+                    <h5>配送超时<span ng-show="count_psto" class="redbadge">{[{count_psto}]}</span></h5>
+                </span>
+            </li>
+        </ul>
+    </div>
+    <div class="medium-7 columns top-divider">
+            <ul class="button-group stack">
+                <li>
+                    <ul class="button-group">
+                        <li>
+                            <span ng-show="tag_delivery[1]" class="label button cb-button" ng-click="alltag(0);tag_delivery[1]=1;goto(page,1)">
+                            <h5>已付款<span ng-show="count_neworderall" class="badge">{[{count_neworderall}]}</span>
+                            <span ng-show="count_neworderto" class="redbadge">{[{count_neworderto}]}</span></h5></span>
+
+                            <span ng-show="!tag_delivery[1]" class="label secondary button cb-button" ng-click="alltag(0);tag_delivery[1]=1;goto(page,1)">
+                            <h5>已付款<span ng-show="count_neworderall" class="badge">{[{count_neworderall}]}</span>
+                            <span ng-show="count_neworderto" class="redbadge">{[{count_neworderto}]}</span></h5></span>
+                        </li>
+                        <li><span class="label icon-space-sm">
+                            <h5><i class="fi-arrow-right" style="color: #008CBA"></i></h5></span>
+                        </li>
+                        <li>
+                            <span ng-show="tag_delivery[2]" class="label button cb-button" ng-click="alltag(0);tag_delivery[2]=1;goto(page,1)"><h5>
+                            商家确认<span ng-show="count_acceptall" class="badge">{[{count_acceptall}]}</span>
+                            <span ng-show="count_acceptto" class="redbadge">{[{count_acceptto}]}</span></h5></span>
+
+                            <span ng-show="!tag_delivery[2]" class="label secondary button cb-button" ng-click="alltag(0);tag_delivery[2]=1;goto(page,1)"><h5>
+                            商家确认<span ng-show="count_acceptall" class="badge">{[{count_acceptall}]}</span>
+                            <span ng-show="count_acceptto" class="redbadge">{[{count_acceptto}]}</span></h5></span>
+                        </li>
+                        <li><span class="label icon-space-sm">
+                            <h5><i class="fi-arrow-right" style="color: #008CBA"></i></h5></span>
+                        </li>
+                        <li>
+                            <span ng-show="tag_delivery[3]" class="label button cb-button" ng-click="alltag(0);tag_delivery[3]=1;goto(page,1)">
+                            <h5>配送确认<span ng-show="count_delaccall" class="badge">{[{count_delaccall}]}</span>
+                            <span ng-show="count_delaccto" class="redbadge">{[{count_delaccto}]}</span></h5></span>
+
+                            <span ng-show="!tag_delivery[3]" class="label secondary button cb-button" ng-click="alltag(0);tag_delivery[3]=1;goto(page,1)">
+                            <h5>配送确认<span ng-show="count_delaccall" class="badge">{[{count_delaccall}]}</span>
+                            <span ng-show="count_delaccto" class="redbadge">{[{count_delaccto}]}</span></h5></span>
+                        </li>
+                    </ul>
+                </li>
+                <li>
+                    <ul class="button-group">
+                        <li><span class="label icon-space-lg">
+                            <h5><i class="fi-arrow-right" style="color: #008CBA"></i></h5></span>
+                        </li>
+                        <li>
+                            <span ng-show="tag_delivery[4]" class="label button cb-button" ng-click="alltag(0);tag_delivery[4]=1;goto(page,1)">
+                            <h5>正在派送<span ng-show="count_deliveryall" class="badge">{[{count_deliveryall}]}</span>
+                            <span ng-show="count_deliveryto" class="redbadge">{[{count_deliveryto}]}</span></h5></span>
+
+                            <span ng-show="!tag_delivery[4]" class="label secondary button cb-button" ng-click="alltag(0);tag_delivery[4]=1;goto(page,1)">
+                            <h5>正在派送<span ng-show="count_deliveryall" class="badge">{[{count_deliveryall}]}</span>
+                            <span ng-show="count_deliveryto" class="redbadge">{[{count_deliveryto}]}</span></h5></span>
+                        </li>
+                        <li><span class="label icon-space-lg">
+                            <h5><i class="fi-arrow-right" style="color: #008CBA"></i></h5></span>
+                        </li>
+                        <li>
+                            <span ng-show="tag_delivery[5]" class="label button cb-button" ng-click="alltag(0);tag_delivery[5]=1;goto(page,1)">
+                            <h5>已送达<span ng-show="count_arrivalall" class="badge">{[{count_arrivalall}]}</span>
+                            <span ng-show="count_arrivalto" class="redbadge">{[{count_arrivalto}]}</span></h5></span>
+
+                            <span ng-show="!tag_delivery[5]" class="label secondary button cb-button" ng-click="alltag(0);tag_delivery[5]=1;goto(page,1)">
+                            <h5>已送达<span ng-show="count_arrivalall" class="badge">{[{count_arrivalall}]}</span>
+                            <span ng-show="count_arrivalto" class="redbadge">{[{count_arrivalto}]}</span></h5></span>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+
+    </div>
+    <div class="medium-2 columns" style="padding-right: 0">
+        <div ng-if="ns==0" data-alert class="alert-box info text-center button" style="margin-bottom: 0;" ng-click="alltag(0);alldeliverytag(1);goto(page, 1)">
+            <strong>{[{ time.split(" ", 2)[0] }]}
+                {[{ time.split(" ", 2)[1] }]}</strong>
+            <br>
+             <i ng-show="tb_change" class="fi-refresh medium"></i>
+             <i ng-show="!tb_change" class="fi-minus medium"></i>
+        </div>
+        <div ng-if="ns==1" data-alert class="alert-box success text-center button" style="margin-bottom: 0;" ng-click="alltag(0);alldeliverytag(1);goto(page, 1)">
+            <strong>{[{ time.split(" ", 2)[0] }]}
+                {[{ time.split(" ", 2)[1] }]}</strong>
+            <br>
+            <i class="fi-rss medium"></i>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="panel" style="border: 0">
+        <div id="right_table" class="small-12 large-12 medium-12 columns" style="padding: 0;">
+            <table width="100%" border="1px solid" class="text-center">
+                <thead>
+                    <th>订单ID</th>
+                    <th>订单状态</th>
+                    <th>配送时间</th>
+                    <th>商家</th>
+                    <th>配送详情</th>
+                </thead>
+                <tbody>
+                    <tr ng-repeat="o in orders track by $index">
+                        <td><a href="javascript:void(0);" data-reveal-id="orderdetail_modal" data-closeOnBackgroundClick="true" ng-click="popdetail(o, $index)">{[{ o.id }]}</a></td>
+                        <td>
+                            <span ng-show="o.color=='gray'" class="label secondary button" ng-click="intro()">{[{ o.wstatus }]}</span>
+                            <span ng-show="o.color=='deepblue'" class="label button" ng-click="intro()">{[{ o.wstatus }]}</span>
+                            <span ng-show="o.color=='blue'" class="label info button" ng-click="intro()">{[{ o.wstatus }]}</span>
+                            <span ng-show="o.color=='yellow'" class="label warning button" ng-click="intro()">{[{ o.wstatus }]}</span>
+                            <span ng-show="o.color=='red'" class="label alert button" ng-click="intro()">{[{ o.wstatus }]}</span>
+                        </td>
+                        <td>
+                            预计时间：{[{ o.expected_date }]}<br>
+                            <span ng-show="o.status != 10 && o.lefttime<0">超时<span ng-show="(-o.lefttime/60)>=1">{[{ (-(o.lefttime-(o.lefttime%60))/60).toFixed(0) }]}小时</span> {[{ -o.lefttime%60 }]}分钟</span>
+                            <span ng-show="o.status != 10 && o.lefttime>=0">剩余<span ng-show="(o.lefttime/60)>=1">{[{ ((o.lefttime-(o.lefttime%60))/60).toFixed(0) }]}小时</span> {[{ o.lefttime%60 }]}分钟</span>
+                            <span ng-show="o.status == 10">用时<span ng-show="(o.lefttime/60)>=1">{[{ ((o.lefttime-(o.lefttime%60))/60).toFixed(0) }]}小时</span> {[{ o.lefttime%60 }]}分钟</span>
+                        </td>
+                        <td>{[{ o.shop.title }]}</td>
+                        <td>
+                            <span ng-show="o.delivery.courier_name">配送员：<strong>{[{ o.delivery.courier_name }]}</strong><br></span>
+                            <span ng-show="o.delivery.courier_mobile">电话：<strong>{[{ o.delivery.courier_mobile }]}</strong><br></span>
+                            <span>地址：<strong>{[{ o.address }]}</strong></span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="row" ng-show="orders.length != 0">
+            <div class="large-4 medium-4 large-centered medium-centered columns">
+                <ul class="pagination">
+                    <li class="arrow"><a href="javascript:void(0);" ng-click="goto(1, 1)">|<<</a></li>
+                    <li ng-show="page>2"><a href="javascript:void(0);" ng-click="goto(page-2, 1)">{[{page-2}]}</a></li>
+                    <li ng-show="page>1"><a href="javascript:void(0);" ng-click="goto(page-1, 1)">{[{page-1}]}</a></li>
+                    <li class="current"><a href="javascript:void(0);" ng-click="goto(page, 1)">{[{page}]}</a></li>
+                    <li><a href="javascript:void(0);" ng-click="goto(page+1, 1)">{[{page+1}]}</a></li>
+                    <li><a href="javascript:void(0);" ng-click="goto(page+2, 1)">{[{page+2}]}</a></li>
+                    <li class="arrow"><a href="javascript:void(0);" ng-click="goto(page+1, 1)">>></a></li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+</div>
+<div id="orderdetail_modal" class="reveal-modal" data-reveal aria-labelledby="orderdetail_modalLabel" aria-hidden="true" role="dialog">
+    <h4 class="text-center"><strong>订单ID-{[{detail_oid}]}</strong> <a class="close-reveal-modal" aria-label="Close">&#215;</a></h4>
+    <hr>
+    <div class="row">
+        <div class="large-4 medium-4 small-12 columns">
+            <div class="panel">
+                <h5 class="text-center">发货</h5>
+                <hr>
+                <div class="row text-center"><strong>ID:</strong> {[{detail_shopuid}]}</div>
+                <div class="row text-center"><strong>{[{detail_shoptitle}]}</strong></div>
+                <div class="row text-center"><strong>地址:</strong> {[{detail_shopaddr}]}</div>
+                <div class="row text-center"><strong>联系电话:</strong> {[{detail_shoptel}]}</div>
+            </div>
+        </div>
+        <div class="large-4 medium-4 small-12 columns">
+            <div class="panel">
+                <h5 class="text-center">商品</h5>
+                <hr>
+                <div class="row text-center"><strong>{[{detail_goodsname}]}</strong></div>
+                <div class="row text-center" ng-show="detail_goodsremark"><strong>备注:</strong> {[{detail_goodsremark}]}</div>
+                <div class="row text-center"><strong>数量:</strong> {[{detail_goodsamount}]} <strong>金额:</strong> {[{detail_goodspayable}]}元</div>
+            </div>
+        </div>
+        <div class="large-4 medium-4 small-12 columns">
+            <div class="panel">
+                <h5 class="text-center">收货</h5>
+                <hr>
+                <div class="row text-center"><strong>ID:</strong> {[{detail_cusuid}]}</div>
+                <div class="row text-center"><strong>{[{detail_cusname}]}</strong></div>
+                <div class="row text-center"><strong>地址:</strong> {[{detail_cusaddr}]}</div>
+                <div class="row text-center"><strong>联系电话:</strong> {[{detail_custel}]}</div>
+            </div>
+        </div>
+    </div>
+    <hr>
+    <div class="row">
+        <div class="large-12 medium-12 small-12">
+            <div class="panel">
+                <div class="row text-center">
+                     配送员：<strong>{[{detail_postman}]}</strong> 电话：<strong>{[{detail_posttel}]}</strong> 当前状态：<strong>{[{detail_poststatus}]}</strong> 更新时间：<strong>{[{detail_postut}]}</strong>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <hr>
+    <div class="row">
+        <div class="large-3 medium-3 small-12 columns" ng-repeat="op in detail_oops">
+            <div class="row">
+                <div class="large-10 medium-10 small-10 columns">
+                    <div class="panel">
+                        <div class="caption">
+                            {[{op.wtype}]}
+                        </div>
+                        <div class="caption">
+                            {[{op.operate_time}]}
+                        </div>
+                    </div>
+                </div>
+                <div class="large-2 medium-2 small-2 vertical-center">
+                    <span ng-if="op.duration" class="label">{[{op.duration_m}]}:{[{ op.duration%60 }]}</span>
+                    <span ng-if="op.duration" class="">---></span>
+                </div>
+            </div>
+        </div>
+        <div class="large-1 medium-1 end"></div>
+    </div>
+    <hr>
+</div>
+<div id="intro_modal" class="reveal-modal small" data-reveal aria-labelledby="intro_modalLabel" aria-hidden="true" role="dialog">
+    <h4>颜色说明</h4>
+    <hr>
+    <div class="row"><span class="label info">正在派送中</span>：正在进行中的未超时订单</div>
+    <div class="row"><span class="label secondary">已送达</span>：订单按时送达</div>
+    <div class="row"><span class="label">消费者已付款</span>：消费者付款<strong>3分钟</strong>后，商户仍未确认</div>
+    <div class="row"><span class="label warning">商家已确认</span>：商家确认后,<strong>5分钟</strong>内仍无配送员接单</div>
+    <div class="row"><span class="label alert">正在派送中</span>：消费者付款<strong>25分钟</strong>后，仍未送达</div>
+</div>
+<div id="progress-bar"  class="reveal-modal progress-back" data-reveal aria-labelledby="progressbar_modalLabel" aria-hidden="true" role="dialog">
+    <div data-alert class="large-12 alert-box warning round text-center" style="border: 3px solid">
+        <h3 style="color: #f5f5f5">载入中...</h3>
+    </div>
+</div>
+<footer>
+    <div class="row">
+        <p>
+            钱方数据 童叟无欺
+        </p>
+    </div>
+</footer>
+</body>
+
+</html>

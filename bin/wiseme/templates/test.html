@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN" ng-app="homeModule">
+<head lang="en">
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="../static/css/foundation.min.css">
+    <link rel="stylesheet" type="text/css" href="../static/css/normalize.css">
+    <link rel="stylesheet" type="text/css" href="../static/css/nearstyle.css">
+    <link rel="shortcut icon" href="../static/imgs/favicon.ico" type="image/x-icon">
+    <script type="text/javascript" src="../static/js/jquery.min.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation.min.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation/foundation.topbar.js"></script>
+    <script src="http://cdn.bootcss.com/angular.js/1.4.0-rc.2/angular.min.js"></script>
+    <script type="text/javascript" src="../static/js/angular-sanitize.min.js"></script>
+    <script type="text/javascript" charset="utf-8">
+        var _ERROR = {
+            _LOGIN_ERROR: '登录失败，请登录',
+            _AUTH_ERROR: '权限不足，请与管理员联系',
+            _HEAD_PAGE: "退一步海阔天空，别往前翻了",
+            _BACK_PAGE: "苦海无涯，回头是岸！别往后翻了",
+            _DATA_FAITURE: "获取数据失败，请点击其他标签尝试，如果不行，请与技术联系"
+        };
+
+        var homeModule = angular.module("homeModule", ["ngSanitize"]);
+        homeModule.config(function ($interpolateProvider) {
+            $interpolateProvider.startSymbol("{[{");
+            $interpolateProvider.endSymbol("}]}");
+        });
+        //通用接口
+        homeModule.factory("Service", function ($http) {
+            service = {};
+            var ERROR_RETRUN = function (status, callback) {
+                if (status == 403) {
+                    callback({success: false, msg: _ERROR._AUTH_ERROR});
+                } else {
+                    callback({success: false, msg: _ERROR._DATA_FAITURE});
+                }
+            };
+
+            //获取信息（get)
+            service.getQueryData = function (url, params, callback) {
+                $http({
+                    method: "GET",
+                    url: url,
+                    params: params,
+                    timeout: 30000
+                }).success(function (data, status, headers, config) {
+                    if (data) {
+                        if (typeof(data) == 'object') {
+                            if (data["respcd"] == "0000") {
+                                callback({success: true, msg: data["respmsg"], data: data["data"]});
+                            } else {
+                                callback({success: false, msg: data["respmsg"]});
+                            }
+                        } else {
+                            callback({success: false, msg: _ERROR._LOGIN_ERROR});
+                        }
+                    } else {
+                        callback({success: false, msg: "数据为空"});
+                    }
+                }).error(function (data, status, headers, config) {
+                     ERROR_RETRUN(status, callback);
+                })
+            };
+
+                //发送信息接口
+            service.postFormData = function (url, params, callback) {
+                $http.post(url,params).success(function (data) {
+                    if (data) {
+                        callback(data);
+                    } else {
+                        callback([]);
+                    }
+                }).error(function (data, status) {
+                    ERROR_RETRUN(status, callback);
+                });
+            }
+
+            return service;
+        });
+        homeModule.controller("homeCtrl", function ($scope, Service){
+            $scope.init = function(profile){
+                $scope.userprofile = profile;
+            }
+        });
+
+    </script>
+    <title>qfpay</title>
+</head>
+<body ng-controller="homeCtrl" ng-init="init({{profile}})">
+<nav class="top-bar">
+    <ul class="title-area">
+        <li class="name">
+            <h1><a href="/"><strong>钱方好近</strong><small>数据白板</small></a></h1>
+        </li>
+    </ul>
+</nav>
+<div class="row bodycontainer ">
+    <div class="row text-center">
+        <p>
+            OK!
+        </p>
+    </div>
+</div>
+<footer>
+    <div class="row">
+        <p>
+            钱方数据 童叟无欺
+        </p>
+    </div>
+</footer>
+</body>
+</html>

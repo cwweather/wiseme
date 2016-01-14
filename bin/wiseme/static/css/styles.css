@@ -1,0 +1,288 @@
+body section{
+
+}
+.total-ul{
+    padding:20px;
+    color: #666;
+}
+.total-ul li{
+    display: inline-block;
+    width:150px;
+    height: 150px;
+    align-content: center;
+    text-align: center;
+    padding-top: 40px;
+    border: 2px solid rgba(233,99,33,0.6);
+    border-radius: 75px;
+}
+.total-ul li:hover{
+    color:#fff;
+    background-color: rosybrown;
+    border:none;
+}
+.total-ul li p{
+    vertical-align: center;
+}
+#new-user-section{
+    padding: 20px;
+}
+.new-users{
+}
+.user-card img{
+    width: 30%;
+    margin-bottom: 10px;
+}
+.user-card h5{
+    position: absolute;
+    top:10px;
+    left:40%;
+}
+
+#items-section,#clum-section{
+    padding: 20px;
+
+}
+#new-user-section h4,
+#items-section h4,
+#clum-section h4{
+    color: brown;
+}
+#other-section{
+    padding: 20px;
+}
+#other-section article{
+    padding: 20px;
+    margin-right: 4px;
+    border:1px solid #fdd;
+}
+/************************* index.html ********************************/
+.row{
+    margin: 0px;
+    padding: 0px;
+}
+#index .cir-tag .glyphicon{
+    font-size: 1.2em;
+    color: #333;
+    display: inline-block;
+    margin-right: 5px;
+}
+#index .cir-tag{
+    text-align: center;
+}
+#index .cir-tag p{
+    font-size: 0.8em;
+    color: #6ba442;
+}
+#index .cir-tag .glyphicon{
+    display:inline-block;
+    margin-left:5px;
+}
+#index {
+    position: relative;
+}
+#index .header-with-toolbar{
+    position: relative;
+}
+#index .sms{
+    background-color: #fff;
+}
+#index .with-color{
+    position: relative;
+    background-color: bisque;
+    padding-left: 5px;
+    margin-top: 20px;
+}
+#index .header-with-toolbar h3{
+    position: relative;
+    left: 0px;
+    color: rgba(99,66,33,.8);
+    font-size: 1.1em;
+}
+#index .header-with-toolbar h4{
+    width: 60%;
+    color: #649345;
+    font-size: 0.9em;
+    padding-left: 2px;
+}
+#index table{
+    box-shadow: 0px 1px 3px #ccc;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+#index .header-with-toolbar aside{
+    position: absolute;
+    top:1px;
+    right: 6px;
+    color: red;
+    font-size: .8em;
+}
+#index .with-color aside{
+    position: absolute;
+    top:18px;
+    right: 19px;
+    color: red;
+}
+#index .page-tool-bar{
+    display:inline-block;
+    margin-right:20px;
+}
+/************************* best-pv.html ******************************/
+#best-pv .th-row1{
+    color: burlywood;
+    font-size: 1.2em;
+
+}
+#best-pv thead{
+    font-size: 0.8em;
+}
+#best-pv tbody{
+    font-size: .8em;
+}
+#best-pv table{
+    box-shadow: 0px 0px 9px #ccc;
+    border-radius: 8px;
+}
+#best-pv td{
+    text-align: center;
+}
+
+#best-pv .pv-uv-now .tital-tag{
+    font-size: 0.8em;
+    padding-top:10px;
+    color: #6ba442;
+}
+
+/*********************************** now.html *************************************/
+#now .go-back{
+    font-size: 2em;
+    position: absolute;
+    top:10px;
+    left: 30px;
+    color: red;
+}
+#now .nav-title{
+    padding: 10px;
+    padding-left:20px;
+}
+#now .page-title{
+    font-size: 1.2em;
+}
+#now .pv-uv-now{
+    padding-left: 35px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+#now .tags p span{
+    color: aliceblue;
+    font-size: 1.2em;
+    display: inline-block;
+    margin-right: 5px;
+    margin-left: 4px;
+}
+#now h4{
+    font-size: 2.5em;
+    text-align: center;
+}
+#now p{
+    width: 100%;
+    color:  #6ba442;
+    font-size: 0.8em;
+    text-align: center;
+}
+
+#now .pv-uv-now .cir-tag{
+    padding: 0px;
+    min-width: 200px;
+    border-radius: 50px;
+    display: inline-block;
+}
+#now .tags .cir-tag:hover{
+    border-radius: 60px;
+    border: 2px solid antiquewhite;
+}
+#now .pv-uv-now div{
+    text-align: center;
+    font-size:110%;
+}
+#now .chart-r{
+    border-radius: 5px;
+    padding: 20px;
+}
+#now .error-row{
+    padding:30px;
+}
+#now #chart-r-status{
+    height:300px !important;
+}
+#now .error-msg{
+    height: 260px;
+    padding:10px;
+    font-size: 1.2em;
+    overflow-y: scroll;
+    text-align: left;
+}
+#now .error-msg p{
+    text-align: left;
+}
+#now .error-title{
+    // text-align: center;
+}
+#now #error-num{
+    color:red;
+}
+#now .error span{
+    display: inline-block;
+    color: red;
+}
+/******************************* logs ************************************/
+#logs .log-info{
+    border: solid 1px bisque;
+}
+#logs .log-info dt, #logs .log-info dd{
+    display: inline-block;
+    margin: 0px;
+    padding: 5px;
+
+}
+#logs .log-msg dt, #logs .log-msg dd{
+    display: inline-block;
+    margin: 0px;
+    padding: 5px;
+}
+#logs .log-info dt{
+    background-color: bisque;
+    color: #666;
+}
+#logs .log-info dd{
+    color: #666;
+}
+#logs li dl{
+    margin: 0px;
+    padding: 0px;
+}
+#logs li{
+    list-style: none;
+    padding:0px;
+}
+
+/******************************* errorlogs ************************************/
+#errorlogs .log-info{
+    border: solid 1px bisque;
+}
+#errorlogs .log-info dt, #errorlogs .log-info dd{
+    display: inline-block;
+    margin: 0px;
+    padding: 5px;
+
+}
+#errorlogs .log-info dt{
+    background-color: bisque;
+    color: #666;
+}
+#errorlogs .log-info dd{
+    color: #666;
+}
+#errorlogs li{
+    list-style: none;
+    padding:0px;
+}

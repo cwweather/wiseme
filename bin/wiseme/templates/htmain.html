@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN" ng-app="homeModule">
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0,user-scalable=no"/>
+    <link rel="stylesheet" type="text/css" href="../static/css/foundation.min.css">
+    <link rel="stylesheet" type="text/css" href="../static/css/normalize.css">
+    <link rel="stylesheet" type="text/css" href="../static/css/htstyle.css">
+    <link rel="stylesheet" type="text/css" href="../static/foundation-icons/foundation-icons.css">
+    <link rel="shortcut icon" href="../static/imgs/favicon.ico" type="image/x-icon">
+    <script type="text/javascript" src="../static/js/jquery.min.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation.min.js"></script>
+    <script type="text/javascript" src="../static/js/foundation/js/foundation/foundation.topbar.js"></script>
+    <script src="http://cdn.bootcss.com/angular.js/1.4.0-rc.2/angular.min.js"></script>
+    <script type="text/javascript" src="../static/js/angular-sanitize.min.js"></script>
+    <script type="text/javascript" src="../static/js/d3/d3.js"></script>
+    <script type="text/javascript" src="../static/js/d3_data.js"></script>
+    <script type="text/javascript" charset="utf-8">
+        var _ERROR = {
+            _LOGIN_ERROR: '登录失败，请登录',
+            _AUTH_ERROR: '权限不足，请与管理员联系',
+            _HEAD_PAGE: "退一步海阔天空，别往前翻了",
+            _BACK_PAGE: "苦海无涯，回头是岸！别往后翻了",
+            _DATA_FAITURE: "获取数据失败，请点击其他标签尝试，如果不行，请与技术联系"
+        };
+        var u_w = 4;
+        var u_h = 4;
+        var s_w = 4;
+        var s_h = 4;
+        var width = 960;
+        var height = 500;
+        var ball_r_unit = 1;
+        var cuba_size_unit = 1;
+        var text_size_unit = 1;
+        var colors=d3.scale.category20();
+        var homeModule = angular.module("homeModule", ["ngSanitize"]);
+        homeModule.config(function ($interpolateProvider) {
+            $interpolateProvider.startSymbol("{[{");
+            $interpolateProvider.endSymbol("}]}");
+        });
+        //通用接口
+        homeModule.factory("Service", function ($http) {
+            service = {};
+            var ERROR_RETRUN = function (status, callback) {
+                if (status == 403) {
+                    callback({success: false, msg: _ERROR._AUTH_ERROR});
+                } else {
+                    callback({success: false, msg: _ERROR._DATA_FAITURE});
+                }
+            };
+
+            //获取信息（get)
+            service.getQueryData = function (url, params, callback) {
+                $http({
+                    method: "GET",
+                    url: url,
+                    params: params,
+                    timeout: 30000
+                }).success(function (data, status, headers, config) {
+                    if (data) {
+                        if (typeof(data) == 'object') {
+                            if (data["respcd"] == "0000") {
+                                callback({success: true, msg: data["respmsg"], data: data["data"]});
+                            } else {
+                                callback({success: false, msg: data["respmsg"]});
+                            }
+                        } else {
+                            callback({success: false, msg: _ERROR._LOGIN_ERROR});
+                        }
+                    } else {
+                        callback({success: false, msg: "数据为空"});
+                    }
+                }).error(function (data, status, headers, config) {
+                     ERROR_RETRUN(status, callback);
+                })
+            };
+
+                //发送信息接口
+            service.postFormData = function (url, params, callback) {
+                $http.post(url,params).success(function (data) {
+                    if (data) {
+                        callback(data);
+                    } else {
+                        callback([]);
+                    }
+                }).error(function (data, status) {
+                    ERROR_RETRUN(status, callback);
+                });
+            }
+
+            return service;
+        });
+        homeModule.controller("homeCtrl", function ($scope, Service){
+            $scope.links = [];
+            $scope.nodes = {};
+            $scope.arrnodes = [];
+            $scope.unilinks = {};
+            $scope.usernodes = {};
+            $scope.force = null;
+            $scope.svg = null;
+            $scope.node = null;
+            $scope.link = null;
+            $scope.zoom = null;
+            $scope.panelshow = 0;
+            $scope.user_img = "n";
+            $scope.user_name = "n";
+            $scope.user_count = "n";
+            $scope.user_shopnum = "n";
+            $scope.ngstyle = "";
+            $scope.mouseposX = 0;
+            $scope.mouseposY = 0;
+            $scope.initforce = function(){
+                $scope.arrnodes = d3.values($scope.nodes);
+                $scope.force = d3.layout.force()
+                        .nodes($scope.arrnodes)
+                        .links($scope.links)
+                        .size([width, height])
+                        .linkDistance(function(d){
+                            if(d.dist >= 10){
+                                return 15;
+                            }else{
+                                return 15 + (10 - d.dist);
+                            }
+                        })
+                        .linkStrength(1)
+                        .friction(0.3)
+                        .gravity(0.2)
+                        .charge(-1500)
+                        .theta(1)
+                        .alpha(0.1)
+                        //.on("mousedown.zoom",null)
+                        .on("tick", tick);
+                $scope.zoom = d3.behavior.zoom()
+                        .scaleExtent([-10,10])
+                        .on("zoom", zoomed);
+                $scope.svg = d3.select("svg")
+                        .attr("width", width)
+                        .attr("height", height)
+                        .append("g")
+                        .call($scope.zoom)
+                        .append("g");
+                $scope.svg.append("rect")
+                        .attr("class", "overlay")
+                        .attr("x", -width*10/2)
+                        .attr("y", -height*10/2)
+                        .attr("width", width*10)
+                        .attr("height", height*10);
+                $scope.node = $scope.svg.selectAll(".node");
+                $scope.link = $scope.svg.selectAll(".link");
+            };
+            $scope.initforce();
+            $scope.startforce = function(){
+                $scope.link = $scope.link.data($scope.force.links());
+                $scope.link.enter().insert("line", ".node")
+                        .attr("class", "link")
+                        .style("stroke", colors(0))
+                        .style("stroke-width", 0.3);
+                $scope.link.exit().remove();
+                $scope.node = $scope.node.data($scope.force.nodes());
+                $scope.node.selectAll("rect")
+                        .attr("x", function (d) {
+                            if (d.count >= 10){
+                                return -s_w * 5;
+                            }
+                            return -(s_w * d.count)/2;
+                        })
+                        .attr("y", function (d) {
+                            if (d.count >= 10){
+                                return -s_h * 5;
+                            }
+                            return -(s_h * d.count)/2;
+                        })
+                        .attr("height", function (d) {
+                            if (d.count >= 10){
+                                return s_h * 10;
+                            }
+                            return s_h * d.count;
+                        })
+                        .attr("width", function (d) {
+                            if (d.count >= 10){
+                                return s_w * 10;
+                            }
+                            return s_w * d.count;
+                        })
+                        .style("fill", colors(1));
+                $scope.node.selectAll("circle")
+                        .attr("r",function(d){  //设置圆点半径
+                            if (d.count <= 1){
+                                return 0;
+                            }
+                            if (d.count >= 10){
+                                return 20;
+                            }
+                            return d.count * 2;
+                        })
+                        .style("fill", colors(3)) ;
+                $scope.node.selectAll("text")
+                        .style("font-size", function(d, i){
+                            if (d.count >= 10){
+                                return 17;
+                            }
+                            return 7 + d.count;
+                        }).text(function(d) {
+                            if (d.type){
+                                if (d.count <= 1){
+                                    return "";
+                                }
+                                return d.username;
+                            }else{
+                                return d.shopname;
+                            }
+                        });
+                var enter = $scope.node.enter().insert("g")
+                        .attr("class", "node")
+                        .on("mouseover", mouseover)
+                        .on("mouseout", mouseout)
+                        .on("mouseup", mouseup)
+                        .call($scope.force.drag);
+                // shop nodes
+                enter.filter(function(d, i) { return 1 - d.type})
+                        .append("rect")
+                        .attr("x", function (d) {
+                            if (d.count >= 10){
+                                return -s_w * 5;
+                            }
+                            return -(s_w * d.count)/2;
+                        })
+                        .attr("y", function (d) {
+                            if (d.count >= 10){
+                                return -s_h * 5;
+                            }
+                            return -s_h/2;
+                        })
+                        .attr("height", function (d) {
+                            if (d.count >= 10){
+                                return s_h * 10;
+                            }
+                            return s_h * d.count;
+                        })
+                        .attr("width", function (d) {
+                            if (d.count >= 10){
+                                return s_w * 10;
+                            }
+                            return s_w * d.count;
+                        })
+                        .style("fill", colors(1)) ;
+                //user nodes
+                enter.filter(function(d, i) {return d.type;})
+                        .append("circle")
+                        .attr("r",function(d){  //设置圆点半径
+                            if (d.count <= 1){
+                                return 0;
+                            }
+                            if (d.count >= 10){
+                                return 20;
+                            }
+                            return d.count * 2;
+                        })
+                        .style("fill", colors(3)) ;
+
+                enter.filter(function(d, i) {
+                            if (d.count > 1){
+                                return 1;
+                            }
+                            return 1;
+                        }).append("text")
+                        .attr("x", 12)
+                        .attr("dy", ".35em")
+                        .attr("fill","#9d9d9d")
+                        .style("font-size", function(d, i){
+                            if (d.count >= 10){
+                                return 17;
+                            }
+                            return 7 + d.count;
+                        })
+                        .text(function(d) {
+                            if (d.type){
+                                if (d.count <= 1){
+                                    return "";
+                                }
+                                return d.username;
+                            }else{
+                                return d.shopname;
+                            }
+                        });
+                $scope.node.exit().remove();
+
+                $scope.force = $scope.force.start();
+            };
+            $scope.updatenodes = function(links){
+                links.forEach(function(link) {
+                    var snode = null;
+                    var tnode = null;
+                    var unikey = link.source+"->"+link.target;
+                    if ( unikey in $scope.unilinks ){
+                        $scope.unilinks[unikey].dist++;
+                        $scope.nodes[link.source].count++;
+                        $scope.nodes[link.target].count++;
+                    }else{
+                        $scope.unilinks[unikey] = link;
+                        if (!(link.source in $scope.nodes)){
+                            //如果不存在该source节点，添加节点, type = 1
+                            snode = {name: link.source, type: 1, count:1, shopnum: 1, username: link.username, img: link.img};
+                            $scope.nodes[link.source] = snode;
+                            $scope.arrnodes.push(snode);
+                        }else{
+                            $scope.nodes[link.source].count++;
+                            $scope.nodes[link.source].shopnum++;
+                        }
+                        if (!(link.target in $scope.nodes)){
+                            //如果不存在该target节点，添加节点, type = 0
+                            tnode = {name: link.target, type: 0, count:1, usernum: 1, shopname: link.shopname};
+                            $scope.nodes[link.target] = tnode;
+                            $scope.arrnodes.push(tnode);
+                        }else{
+                            $scope.nodes[link.target].count++;
+                            $scope.nodes[link.target].usernum++;
+                        }
+                        link.source = $scope.nodes[link.source];
+                        link.target = $scope.nodes[link.target];
+                        if (!("dist" in link)){
+                            link.dist = 1;
+                        }
+                        link.weight = 1;
+                        link.color = 65;
+                        $scope.links.push(link);
+                    }
+                });
+            };
+            $scope.init = function(){
+                //img, username, source: userid; target: shopid; dist: shop_order_cnt; type: order_type
+                var newlinks = d3newlinks.slice(0, 2000);
+                $scope.updatenodes(newlinks);
+                $scope.startforce();
+            };
+            var init_index = 2000;
+
+            $scope.addnode = function(){
+                var newlinks = [];
+                var len = 5;
+                var dddd = [{"username": "君", "target": 1391836, "img": "http://wx.qlogo.cn/mmopen/aXRG36szbYrYBHElEVdkotqypEPAo4MKX6qqwyFtSlGRib6uYTWvOI5ccDqyLED4qRbh97tibj7p3NJS9elULEsSt65fkMYYrF/0", "datetime": "2015-12-18 17:35:39", "source": 1111, "type": "买单/外卖/特卖", "shopname": "llaollao冻酸奶"}]
+                $scope.updatenodes(d3newlinks.slice(init_index, init_index+len));
+                init_index += len;
+                $scope.startforce();
+            };
+
+            function tick() {//打点更新坐标
+                $scope.node.attr("transform", function(d) {
+                    return "translate(" + d.x + "," + d.y + ")";
+                });
+                $scope.link.attr("x1", function(d) {return d.source.x;})
+                        .attr("y1", function(d) { return d.source.y; })
+                        .attr("x2", function(d) { return d.target.x; })
+                        .attr("y2", function(d) { return d.target.y; });
+            }
+            function zoomed(){
+                $scope.svg.attr("transform",
+				"translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+            }
+            function mouseover(d, i) {
+                $scope.$apply(function(){
+                    if(d.type){
+                        $scope.panelshow = 1;
+                        $scope.user_img = d.img;
+                        $scope.user_name = d.username;
+                        $scope.user_shopnum = d.shopnum;
+                    }else{
+                        $scope.panelshow = 2;
+                        $scope.user_name = d.shopname;
+                        $scope.user_shopnum = d.usernum;
+                    }
+                    $scope.mouseposX = d3.event.clientX;
+                    $scope.mouseposY = d3.event.clientY;
+                    $scope.user_count = d.count;
+                });
+            }
+
+            function mouseout() {
+                $scope.$apply(function() {
+                    $scope.panelshow = 0;
+                });
+            }
+
+            function mouseup(d, i) {
+                findrelations(d.name);
+            }
+
+            function findrelations(userid){
+                var users = [];
+                var shops = [];
+                var selectlinks = [];
+                //$scope.force.nodes($scope.arrnodes).links($scope.links);
+                //$scope.node.exit().remove();
+                //$scope.link.exit().remove();
+                /*
+                for( var i = 0; i < 2000; i++){
+                    if(d3newlinks[i].source == userid){
+                        selectlinks.push(d3newlinks[i]);
+                    }
+                }
+                $scope.updatenodes(selectlinks);
+                $scope.startforce();*/
+                //$scope.addnode();
+            }
+        });
+    </script>
+    <title>qfpay</title>
+</head>
+<body class="" ng-controller="homeCtrl" ng-init="init()">
+<nav class="top-bar header-view">
+    <div class="small-8 medium-3 large-3 columns" style="padding: 0">
+        <ul class="title-area">
+            <li class="name">
+                <a class="button branch-button" href="/"><strong><i class="fi-like medium"></i>钱方数据圈</strong></a>
+            </li>
+        </ul>
+    </div>
+</nav>
+<div class="row">
+    <a class="button" ng-click="addnode()">add</a>
+</div>
+    <svg style="height: 100%; width: 100%; background-color: #333333">
+    </svg>
+<div id="user_desc" class="panel circle_wd" ng-show="panelshow==1" ng-style="{left: mouseposX, top: mouseposY}">
+    <div class="text-center"><img class="img-circle" style="width: 50px; height: 50px; border-radius: 25px" src="{[{user_img}]}"></div>
+    <p class="text-center"><h5 class="text-center" style="color: #f5f5f5;">{[{user_name}]}<br>共消费{[{user_shopnum}]}家店/{[{user_count}]}次</h5></p>
+</div>
+<div id="shop_desc" class="panel square_wd" ng-show="panelshow==2" ng-style="{left: mouseposX, top: mouseposY}">
+    <p class="text-center"><h5 class="text-center" style="color: #f5f5f5;">{[{user_name}]}</h5></p>
+    <p class="text-center"><h5 class="text-center" style="color: #f5f5f5;">共有{[{user_shopnum}]}个用户/{[{user_count}]}次消费</h5></p>
+</div>
+<footer>
+    <div class="row">
+        <p>
+            钱方数据 童叟无欺
+        </p>
+    </div>
+</footer>
+</body>
+</html>
